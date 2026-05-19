@@ -6,7 +6,6 @@
 import {
   ComposedChart,
   Line,
-  Scatter,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -37,8 +36,8 @@ function formatTons(value: number): string {
 }
 
 type TooltipEntry = {
-  name?: string;
-  value?: number;
+  name?: string | number;
+  value?: string | number | readonly (string | number)[];
   color?: string;
 };
 
@@ -48,19 +47,28 @@ function CustomTooltip({
   label,
 }: {
   active?: boolean;
-  payload?: TooltipEntry[];
-  label?: number;
+  payload?: readonly TooltipEntry[];
+  label?: string | number;
 }) {
   if (!active || !payload || payload.length === 0) return null;
+  const projected = payload.find((e) => e.name === "projected")?.value;
+  const required = payload.find((e) => e.name === "required")?.value;
+  const projectedOnTrack =
+    typeof projected === "number" && typeof required === "number" && projected <= required;
+
   return (
     <div className="rounded border bg-white px-3 py-2 text-xs shadow-md">
       <p className="mb-1 font-semibold">{label}</p>
       {payload.map((entry) => {
         if (entry.name === "current" || entry.value == null) return null;
+        const display = typeof entry.value === "number"
+          ? entry.value.toLocaleString()
+          : String(entry.value);
+        const color = entry.name === "projected" && projectedOnTrack ? GREEN : entry.color;
         return (
-          <p key={entry.name} style={{ color: entry.color }}>
+          <p key={entry.name} style={{ color }}>
             {entry.name === "required" ? "Required path" : "Projected"}:{" "}
-            {entry.value.toLocaleString()} t CO₂/yr
+            {display} t CO₂/yr
           </p>
         );
       })}
@@ -82,10 +90,6 @@ export default function ProjectionChart({
       ? `Net zero by ${netZeroYear}`
       : `Net zero not reached by ${lastYear}`;
 
-  // Scatter needs data with x/y keys; extract current-year dot only.
-  const currentDot = rows
-    .filter((r) => r.current != null)
-    .map((r) => ({ year: r.year, value: r.current as number }));
 
   return (
     <div className="flex flex-col gap-2">
@@ -125,7 +129,7 @@ export default function ProjectionChart({
             }}
             width={52}
           />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={CustomTooltip} />
           <Legend verticalAlign="top" height={32} />
 
           {/* Net-zero floor */}
@@ -152,7 +156,11 @@ export default function ProjectionChart({
             stroke={projectedColor}
             fill="url(#projectedGradient)"
             strokeWidth={2}
-            dot={false}
+            dot={(props: { cx?: number; cy?: number; payload: { current: number | null } }) =>
+              props.payload.current != null ? (
+                <circle key="current-dot" cx={props.cx} cy={props.cy} r={5} fill={projectedColor} stroke="white" strokeWidth={2} />
+              ) : <g key="no-dot" />
+            }
             activeDot={false}
             isAnimationActive={false}
           />
@@ -169,15 +177,6 @@ export default function ProjectionChart({
             isAnimationActive={false}
           />
 
-          {/* Current-year dot on the projected line */}
-          <Scatter
-            data={currentDot}
-            dataKey="value"
-            name="current"
-            fill={projectedColor}
-            line={false}
-            legendType="none"
-          />
         </ComposedChart>
       </ResponsiveContainer>
 

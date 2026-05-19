@@ -9,7 +9,7 @@ datasource db {
 
 model City {
   id             Int            @id @default(autoincrement())
-  name           String         @unique
+  name           String         @unique @db.Citext
   baseline_tons  Int
   baseline_year  Int
   target_year    Int
@@ -39,7 +39,7 @@ model ClimateAction {
   id               Int      @id @default(autoincrement())
   cityId           Int
   city             City     @relation(fields: [cityId], references: [id])
-  title            String
+  title            String   @db.Citext
   sector           Sector
   status           Status
   annual_reduction Int
@@ -47,6 +47,8 @@ model ClimateAction {
   source           Source
   confidence       Float?
   createdAt        DateTime @default(now())
+
+  @@unique([cityId, title])
 }
 
 enum Role {

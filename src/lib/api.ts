@@ -41,7 +41,12 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`API ${init?.method ?? "GET"} ${url} → ${res.status}: ${body}`);
+    let message = body;
+    try {
+      const json = JSON.parse(body);
+      if (typeof json.error === "string") message = json.error;
+    } catch {}
+    throw new Error(message);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -53,6 +58,18 @@ export function listCities(): Promise<City[]> {
 
 export function getCity(id: number): Promise<City> {
   return apiFetch<City>(`/api/v1/cities/${id}`);
+}
+
+export function createCity(data: Omit<City, "id">): Promise<City> {
+  return apiFetch<City>("/api/v1/cities", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteCity(id: number): Promise<void> {
+  return apiFetch<void>(`/api/v1/cities/${id}`, { method: "DELETE" });
 }
 
 export function updateCity(id: number, data: Partial<Omit<City, "id" | "name">>): Promise<City> {
