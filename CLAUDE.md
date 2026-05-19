@@ -55,6 +55,15 @@ This file is the single source of truth for subagents working on this project. R
 - Status pills: planned (gray), in_progress (blue), completed (green)
 - Sector pills: neutral background
 
+### User (added in P6)
+- `id` (Int, autoincrement)
+- `email` (String, unique)
+- `password_hash` (String) — bcryptjs hash, never returned to client
+- `role` (enum `Role`: `admin | viewer`)
+- `createdAt` (DateTime)
+
+The `viewer` role exists for forward compatibility; current behavior is identical to anonymous (all `/public/**` is open). Only `admin` unlocks `/admin/**` routes and mutating API calls.
+
 ---
 
 ## 4. On-track formula (dashboard)
@@ -74,27 +83,34 @@ on_track        = achieved ≥ expected_now   → green
 
 ## 5. Routes & ownership
 
-| Route | Owner phase | Notes |
+**Path-based multi-city** (introduced in P6). Top-level `/public` and `/admin` show city pickers; per-city views live under `/public/cities/[cityId]` and `/admin/cities/[cityId]`.
+
+| Route | Owner | Notes |
 |---|---|---|
-| `/` | P1 | Server-rendered homepage showing seeded city name + action count — proves the stack works end-to-end. |
-| `/admin` | P3 | Tab nav (Actions \| Import from text). City config card + actions table + Add/Edit Dialog. |
-| `/admin/import` | P3 | Textarea + Extract button → editable review table → Save selected. |
-| `/public` | P4 | Dashboard (totals, sector bars, on-track) + actions list. |
-| `/api/v1/cities/[id]` | P2 | GET, PUT |
-| `/api/v1/actions` | P2 | GET (list, optional `?cityId=`), POST |
-| `/api/v1/actions/[id]` | P2 | PUT, DELETE |
-| `/api/v1/actions/bulk` | P2 | POST — array of actions, used by Save selected after extraction |
-| `/api/v1/actions/extract` | P2 | POST `{text, cityId}` → `{extracted: Action[], skipped: {reason, raw}[]}` |
+| `/` | P1 → P6 | Landing page. Links to `/public` and (if logged-in admin) `/admin`. |
+| `/login` | P6 | Server shell + client form. POSTs to `signIn('credentials')`. Redirects to `/admin` on success. |
+| `/admin` | P3 → P6 | **City list** for admins (cards). Gated by middleware → `/login` if anonymous. |
+| `/admin/cities/[cityId]` | P3 → P6 | Tab nav (Actions \| Import). City config + actions table. (Was `/admin` in P3.) |
+| `/admin/cities/[cityId]/import` | P3 → P6 | Textarea + Extract + review table. (Was `/admin/import` in P3.) |
+| `/public` | P4 → P6 | **City list** for anonymous + viewer (cards). Open to all. |
+| `/public/cities/[cityId]` | P4 → P6 | Dashboard (totals, sector bars, on-track) + actions list. (Was `/public` in P4.) |
+| `/api/auth/[...nextauth]` | P6 | NextAuth handler (Credentials provider, JWT sessions). |
+| `/api/v1/cities` | P6 | GET (list all cities). |
+| `/api/v1/cities/[id]` | P2 | GET (open), PUT (admin only). |
+| `/api/v1/actions` | P2 | GET (open, `?cityId=`), POST (admin only). |
+| `/api/v1/actions/[id]` | P2 | PUT, DELETE (admin only). |
+| `/api/v1/actions/bulk` | P2 | POST (admin only). |
+| `/api/v1/actions/extract` | P2 | POST (admin only). |
 
-### Shared component ownership (parallel phase coordination)
+### Header behavior (after P6)
+- **Anonymous:** site title + "Log in" link.
+- **Logged-in viewer:** site title + user email + Logout. No Public/Admin toggle.
+- **Logged-in admin:** site title + Public/Admin pill toggle + user email + Logout.
+  - Toggle navigates between the current city's admin and public views when on a city-scoped route (e.g., `/admin/cities/2` → `/public/cities/2`).
+  - On top-level `/admin` or `/public`, toggle navigates to the sibling top-level page.
 
-**Phase 3 owns and creates** (Phase 4 consumes read-only):
-- `src/components/Header.tsx` — title + role toggle (localStorage `role` key, values `admin`/`public`)
-- `src/components/RoleToggle.tsx` — the Public/Admin pill toggle
-- `src/lib/api.ts` — fetch wrappers for the API routes
-- `src/app/layout.tsx` — root layout with the Header
-
-If Phase 4 runs before Phase 3 has committed those files, Phase 4 should **stub** the Header inline in `/public` and leave a `TODO: replace with shared Header` comment. Do not create the shared file from Phase 4.
+### Component ownership
+The shared components (`Header.tsx`, `RoleToggle.tsx`, `src/lib/api.ts`, `src/app/layout.tsx`) created in P3 are **rewritten** in P6 to be session-aware. Old localStorage `role` flag is removed.
 
 ---
 
@@ -138,6 +154,7 @@ Each phase ends with a feature a human can interact with. Do not mark a phase co
 | P2 | `curl localhost:3000/api/v1/cities/1` returns the seeded city. `curl -X POST localhost:3000/api/v1/actions/extract -d '{"text": "We will electrify 50 buses by 2027 (saves ~8000 t/yr).", "cityId": 1}'` returns structured actions. Document every curl in `docs/api-curl.md`. |
 | P3 | Open `/admin`. Edit city config and save. Add an action manually. Edit it. Delete it. Switch to Import tab, paste sample text, click Extract, see review rows, save them. Confirm rows appear in Actions tab with `source = ai`. |
 | P4 | Open `/public`. See totals, sector breakdown bars, on-track indicator with numbers. Toggle to Admin role from header → land on `/admin`. |
+| P6 | Visit `/public` (no login) → see 3 city cards. Click Greenville → existing dashboard at `/public/cities/1`. Visit `/admin` → redirected to `/login`. Log in with seeded creds → land on `/admin` (city list). Open Riverdale & Lakewood admin views, add an action in each. Toggle Public ↔ Admin from header (city-aware). Logout → header shows "Log in". Riverdale shows **off-track**, Lakewood shows **on-track**. |
 | P5 | Fresh clone, follow README, app boots in ≤3 commands. AI write-up reads in ≤2 minutes. |
 
 ---
@@ -150,7 +167,8 @@ Update this section at the **end of your phase** (last commit). Keep it short.
 - [x] **P2 Backend** — *complete*
 - [x] **P3 Admin UI** — *complete*
 - [x] **P4 Public dashboard** — *complete*
-- [ ] **P5 Docs + QA** — *not started* (blocked by P3, P4)
+- [ ] **P6 Auth + multi-city** — *not started* (blocked by P4)
+- [ ] **P5 Docs + QA** — *not started* (blocked by P6)
 
 ---
 
@@ -168,8 +186,14 @@ Update this section at the **end of your phase** (last commit). Keep it short.
 
 `.env.example` (committed):
 ```
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/climate?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/climate?schema=public"
 ANTHROPIC_API_KEY=""
+NEXT_PUBLIC_BASE_URL="http://localhost:3000"
+
+# Auth (added in P6)
+AUTH_SECRET=""                       # generate with: openssl rand -base64 32
+ADMIN_EMAIL="admin@example.com"      # seeded admin login
+ADMIN_PASSWORD="admin1234"           # seeded admin password (bcrypt-hashed at seed time)
 ```
 
 `.env` (gitignored) — values for local dev. The orchestrator will populate `ANTHROPIC_API_KEY` before Phase 2.
@@ -204,6 +228,49 @@ Normalize on insert:
 - All seeded actions: `source: "manual"`, `confidence: null`
 
 Seed must be **idempotent** (use `upsert` on a stable key, or wipe-and-reinsert when run repeatedly).
+
+### Additional cities (P6)
+
+Seed two more cities so multi-city has something to show. Use `upsert` keyed by city `name`.
+
+**Riverdale** — small, mostly-planned, off-track:
+```json
+{
+  "city": "Riverdale",
+  "baselineEmissions": 180000,
+  "baselineYear": 2020,
+  "targetYear": 2040,
+  "actions": [
+    { "title": "Replace municipal streetlights with LEDs", "sector": "energy", "annualReduction": 2500, "status": "in progress", "startYear": 2024 },
+    { "title": "Curbside compost pilot", "sector": "waste", "annualReduction": 1500, "status": "planned", "startYear": 2027 },
+    { "title": "Downtown protected bike lanes", "sector": "transport", "annualReduction": 4000, "status": "planned", "startYear": 2028 }
+  ]
+}
+```
+
+**Lakewood** — ambitious, completed-heavy, on-track:
+```json
+{
+  "city": "Lakewood",
+  "baselineEmissions": 320000,
+  "baselineYear": 2018,
+  "targetYear": 2030,
+  "actions": [
+    { "title": "Citywide rooftop solar mandate", "sector": "energy", "annualReduction": 60000, "status": "completed", "startYear": 2020 },
+    { "title": "Electrify entire bus fleet", "sector": "transport", "annualReduction": 40000, "status": "in progress", "startYear": 2022 },
+    { "title": "Net-zero new building code", "sector": "buildings", "annualReduction": 25000, "status": "in progress", "startYear": 2021 },
+    { "title": "Lakeside wetland restoration", "sector": "land_use", "annualReduction": 18000, "status": "completed", "startYear": 2019 },
+    { "title": "Zero-waste-to-landfill goal", "sector": "waste", "annualReduction": 12000, "status": "in progress", "startYear": 2023 }
+  ]
+}
+```
+
+### Admin user (P6)
+
+Seed exactly one user from env vars (idempotent `upsert` on `email`):
+- `email`: from `ADMIN_EMAIL`
+- `password_hash`: bcryptjs hash of `ADMIN_PASSWORD` (cost factor 10)
+- `role`: `admin`
 
 ---
 
@@ -253,11 +320,46 @@ Define success criteria. Loop until verified.
 
 These are documented as out-of-scope in the README — don't add them on your own initiative:
 
-- Real auth (NextAuth, sessions). Header toggle only.
-- Multi-city UI. Schema supports it; UI assumes city #1.
 - Recharts / any chart library.
 - Pagination, search, sorting on the actions table.
 - Action history / audit log.
 - Automated test suite.
 - Streaming AI extraction.
 - Retry logic on Claude failures.
+- User registration UI / password reset / email verification (only seeded admin exists).
+- Per-city admin scoping (all admins see all cities — by design for v1).
+
+---
+
+## 14. Auth contract (P6)
+
+**Library:** Auth.js v5 (`next-auth@beta` or `@auth/core`, whichever matches stable v5 channel at install time) with **Credentials** provider.
+
+**Session strategy:** JWT (no `Session`/`Account` Prisma tables). The JWT carries `{ userId, email, role }`.
+
+**Login flow:**
+- `POST /api/auth/callback/credentials` (handled by NextAuth) validates `email` + `password` against the `User` table.
+- On success, JWT cookie set; redirect to `/admin`.
+- On failure, return to `/login` with an inline error.
+
+**Server-side auth helpers** (in `src/lib/auth.ts`):
+- `auth()` — re-export NextAuth's session getter.
+- `requireAdmin()` — async helper for API routes: calls `auth()`, throws `Response(401)` / `Response(403)` if not admin. Used at the top of every mutating API route.
+
+**Middleware:** `middleware.ts` at project root.
+- Matcher: `["/admin/:path*"]`.
+- If no session → redirect to `/login?callbackUrl=<original>`.
+- If session but role !== `admin` → redirect to `/public`.
+
+**Public routes (no auth):**
+- `GET /` , `GET /login`, `GET /public/**`
+- `GET /api/v1/cities/**`, `GET /api/v1/actions` (and `/[id]`)
+
+**Protected routes (admin only):**
+- `GET/POST /admin/**`
+- `PUT /api/v1/cities/[id]`
+- `POST /api/v1/actions`, `PUT/DELETE /api/v1/actions/[id]`, `POST /api/v1/actions/bulk`, `POST /api/v1/actions/extract`
+
+**Hashing:** `bcryptjs` (pure JS, no native deps — Docker-safe). Cost factor 10. Never log or return `password_hash` to the client.
+
+**AUTH_SECRET:** required in `.env` for JWT signing. Seed/setup should generate a placeholder if blank, but README documents `openssl rand -base64 32`.
