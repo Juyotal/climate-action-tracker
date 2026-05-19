@@ -185,7 +185,7 @@ async function main() {
         cityId: lakewood.id,
         title: "Citywide rooftop solar mandate",
         sector: "energy",
-        annual_reduction: 60000,
+        annual_reduction: 125000,
         status: "completed",
         start_year: 2020,
         source: "manual",

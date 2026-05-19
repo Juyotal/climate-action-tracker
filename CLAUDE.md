@@ -256,7 +256,7 @@ Seed two more cities so multi-city has something to show. Use `upsert` keyed by 
   "baselineYear": 2018,
   "targetYear": 2030,
   "actions": [
-    { "title": "Citywide rooftop solar mandate", "sector": "energy", "annualReduction": 60000, "status": "completed", "startYear": 2020 },
+    { "title": "Citywide rooftop solar mandate", "sector": "energy", "annualReduction": 125000, "status": "completed", "startYear": 2020 },
     { "title": "Electrify entire bus fleet", "sector": "transport", "annualReduction": 40000, "status": "in progress", "startYear": 2022 },
     { "title": "Net-zero new building code", "sector": "buildings", "annualReduction": 25000, "status": "in progress", "startYear": 2021 },
     { "title": "Lakeside wetland restoration", "sector": "land_use", "annualReduction": 18000, "status": "completed", "startYear": 2019 },
@@ -346,7 +346,7 @@ These are documented as out-of-scope in the README — don't add them on your ow
 - `auth()` — re-export NextAuth's session getter.
 - `requireAdmin()` — async helper for API routes: calls `auth()`, throws `Response(401)` / `Response(403)` if not admin. Used at the top of every mutating API route.
 
-**Middleware:** `middleware.ts` at project root.
+**Middleware:** Next.js 16 uses `src/proxy.ts` (not `middleware.ts` — the older name is silently ignored in Next 16 with `src/` layout). Export name: `proxy`.
 - Matcher: `["/admin/:path*"]`.
 - If no session → redirect to `/login?callbackUrl=<original>`.
 - If session but role !== `admin` → redirect to `/public`.
