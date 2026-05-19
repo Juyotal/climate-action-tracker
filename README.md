@@ -124,6 +124,19 @@ on_track        = achieved ≥ expected_now ? green : red
 
 The dashboard always shows the raw `achieved` and `expected_now` next to the indicator so the verdict isn't a black box.
 
+### Sector breakdown bars
+
+Each sector bar width is a percentage **relative to the highest-reducing sector**, not relative to the city's total baseline. Concretely:
+
+```
+maxSectorTotal = max(annual_reduction sum per sector)   -- floor of 1 to avoid ÷0
+pct            = round((sectorTotal / maxSectorTotal) × 100)
+```
+
+This means the top sector always renders at 100% width; every other sector scales proportionally to it. The raw `t CO₂/yr` number is shown alongside so the bar is never a black box.
+
+`groupBySector` (in `lib/dashboard.ts`) sums `annual_reduction` across **all** actions for each sector (regardless of status or start year) — it's a capacity view, not the filtered "achieved" figure used for the on-track calculation.
+
 ---
 
 ## Environment variables
