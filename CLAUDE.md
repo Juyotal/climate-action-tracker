@@ -168,7 +168,7 @@ Update this section at the **end of your phase** (last commit). Keep it short.
 - [x] **P3 Admin UI** — *complete*
 - [x] **P4 Public dashboard** — *complete*
 - [x] **P6 Auth + multi-city** — *complete*
-- [ ] **P5 Docs + QA** — *not started* (blocked by P6)
+- [x] **P5 Docs + QA** — *complete*
 
 ---
 
