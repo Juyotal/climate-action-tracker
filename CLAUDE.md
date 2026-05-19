@@ -148,7 +148,7 @@ Update this section at the **end of your phase** (last commit). Keep it short.
 
 - [x] **P1 Foundation** — *complete*
 - [x] **P2 Backend** — *complete*
-- [ ] **P3 Admin UI** — *not started* (blocked by P2)
+- [x] **P3 Admin UI** — *complete*
 - [ ] **P4 Public dashboard** — *not started* (blocked by P2)
 - [ ] **P5 Docs + QA** — *not started* (blocked by P3, P4)
 

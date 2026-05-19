@@ -1,24 +1,34 @@
-import { prisma } from "@/lib/prisma";
+import Link from "next/link";
 
-export default async function Home() {
-  const city = await prisma.city.findFirst({
-    include: { _count: { select: { actions: true } } },
-  });
-
-  if (!city) {
-    return (
-      <main className="p-8">
-        <p>No city found. Run the seed: <code>npx prisma db seed</code></p>
-      </main>
-    );
-  }
-
+export default function Home() {
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-bold">{city.name} Climate Action Tracker</h1>
-      <p className="mt-2 text-gray-600">
-        {city._count.actions} actions tracked · Baseline: {city.baseline_tons.toLocaleString()} t CO₂ · Target year: {city.target_year}
+    <div className="mx-auto max-w-5xl px-4 py-16">
+      <h1 className="mb-2 font-heading text-2xl font-semibold">
+        City Climate Action Tracker
+      </h1>
+      <p className="mb-10 text-sm text-muted-foreground">
+        Choose a view to continue.
       </p>
-    </main>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Link
+          href="/public"
+          className="flex flex-col gap-2 rounded-xl border border-border bg-card p-6 transition-colors hover:bg-muted"
+        >
+          <span className="font-heading text-base font-medium">Public dashboard</span>
+          <span className="text-sm text-muted-foreground">
+            View city totals, sector breakdown, and on-track indicator.
+          </span>
+        </Link>
+        <Link
+          href="/admin"
+          className="flex flex-col gap-2 rounded-xl border border-border bg-card p-6 transition-colors hover:bg-muted"
+        >
+          <span className="font-heading text-base font-medium">Admin</span>
+          <span className="text-sm text-muted-foreground">
+            Configure city, manage climate actions, and import from text.
+          </span>
+        </Link>
+      </div>
+    </div>
   );
 }
