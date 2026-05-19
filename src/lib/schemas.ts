@@ -37,3 +37,14 @@ export const CityInsertSchema = z.object({
 });
 
 export const CityUpdateSchema = CityInsertSchema.partial();
+
+// Used as the AI tool input schema for extract_climate_actions.
+// Omits cityId (server-set) and source (server-sets "ai"). Requires confidence.
+export const AIExtractedActionSchema = z.object({
+  title: z.string().min(1),
+  sector: SectorEnum,
+  status: StatusEnum,
+  annual_reduction: z.number().int().nonnegative(),
+  start_year: z.number().int().min(2000).max(2100),
+  confidence: z.number().min(0).max(1),
+});
