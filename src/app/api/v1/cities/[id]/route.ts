@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { CityUpdateSchema } from "@/lib/schemas";
+import { requireAdmin } from "@/lib/auth";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -19,6 +20,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
+  const authErr = await requireAdmin();
+  if (authErr) return authErr;
   const { id } = await params;
   const cityId = parseInt(id, 10);
   if (isNaN(cityId)) {

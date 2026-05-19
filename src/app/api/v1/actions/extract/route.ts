@@ -5,6 +5,7 @@ import {
   AIExtractedActionSchema,
   AIExtractToolInputSchema,
 } from "@/lib/schemas";
+import { requireAdmin } from "@/lib/auth";
 
 const RequestSchema = z.object({
   text: z.string().min(20),
@@ -27,6 +28,8 @@ const TOOL_INPUT_SCHEMA = z.toJSONSchema(
 ) as Anthropic.Tool["input_schema"];
 
 export async function POST(req: NextRequest) {
+  const authErr = await requireAdmin();
+  if (authErr) return authErr;
   const body = await req.json();
   const parsed = RequestSchema.safeParse(body);
   if (!parsed.success) {

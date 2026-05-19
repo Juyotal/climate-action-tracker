@@ -93,7 +93,7 @@ export function ImportClient({ cityId }: Props) {
       setSkipped([]);
       setChecked(new Set());
       setText("");
-      router.push("/admin");
+      router.push(`/admin/cities/${cityId}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Save failed.");
     } finally {

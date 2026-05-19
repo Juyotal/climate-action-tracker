@@ -1,216 +1,35 @@
-// /public — read-only climate dashboard. Server Component.
+// Public city list — server component. Open to all.
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import type { City, ClimateAction } from "@/lib/api";
-import { computeOnTrack, groupBySector } from "@/lib/dashboard";
+import Link from "next/link";
+import type { City } from "@/lib/api";
 
-const SECTOR_LABELS: Record<ClimateAction["sector"], string> = {
-  transport: "Transport",
-  energy: "Energy",
-  buildings: "Buildings",
-  waste: "Waste",
-  land_use: "Land use",
-};
-
-async function fetchCity(): Promise<City> {
+async function fetchCities(): Promise<City[]> {
   const base = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
-  const res = await fetch(`${base}/api/v1/cities/1`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to fetch city");
+  const res = await fetch(`${base}/api/v1/cities`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch cities");
   return res.json();
 }
 
-async function fetchActions(cityId: number): Promise<ClimateAction[]> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
-  const res = await fetch(`${base}/api/v1/actions?cityId=${cityId}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to fetch actions");
-  return res.json();
-}
-
-function StatusBadge({ status }: { status: ClimateAction["status"] }) {
-  const styles: Record<ClimateAction["status"], string> = {
-    planned: "bg-muted text-muted-foreground border-border",
-    in_progress: "bg-blue-100 text-blue-700 border-blue-200",
-    completed: "bg-green-100 text-green-700 border-green-200",
-  };
-  const labels: Record<ClimateAction["status"], string> = {
-    planned: "Planned",
-    in_progress: "In progress",
-    completed: "Completed",
-  };
-  return (
-    <span
-      className={`inline-flex h-5 items-center rounded-full border px-2 text-xs font-medium ${styles[status]}`}
-    >
-      {labels[status]}
-    </span>
-  );
-}
-
-function SourceLabel({ action }: { action: ClimateAction }) {
-  if (action.source === "manual") return <span className="text-muted-foreground">Manual</span>;
-  const pct = action.confidence != null ? Math.round(action.confidence * 100) : null;
-  return (
-    <span className="text-muted-foreground">
-      AI{pct != null ? ` ${pct}%` : ""}
-    </span>
-  );
-}
-
-export default async function PublicDashboardPage() {
-  const city = await fetchCity();
-  const actions = await fetchActions(city.id);
-  const currentYear = new Date().getFullYear();
-
-  // All math runs server-side
-  const onTrack = computeOnTrack(city, actions, currentYear);
-  const sectorSummaries = groupBySector(actions);
-
-  // Total committed reductions: in_progress or completed, start_year ≤ current_year
-  const totalCommitted = actions
-    .filter(
-      (a) =>
-        (a.status === "in_progress" || a.status === "completed") &&
-        a.start_year <= currentYear
-    )
-    .reduce((sum, a) => sum + a.annual_reduction, 0);
-
-  // Sector bar scaling: largest total = 100%
-  const maxSectorTotal = Math.max(...sectorSummaries.map((s) => s.total), 1);
+export default async function PublicCityListPage() {
+  const cities = await fetchCities();
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 flex flex-col gap-8">
-      {/* City heading */}
-      <div>
-        <h1 className="font-heading text-2xl font-semibold">{city.name}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Climate progress dashboard</p>
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {/* Baseline */}
-        <Card>
-          <CardHeader className="pb-1">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Baseline emissions (t CO₂/yr)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{city.baseline_tons.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-
-        {/* Total committed reductions */}
-        <Card>
-          <CardHeader className="pb-1">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Achieved &amp; in progress (t/yr)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{totalCommitted.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-
-        {/* On-track indicator */}
-        <Card>
-          <CardHeader className="pb-1">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              On-track status
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-1">
-            <span
-              className={`inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-sm font-semibold ${
-                onTrack.onTrack
-                  ? "bg-green-100 text-green-700 border-green-200"
-                  : "bg-red-100 text-red-700 border-red-200"
-              }`}
-            >
-              {onTrack.onTrack ? "On track ✓" : "Off track"}
+    <div className="mx-auto max-w-5xl px-4 py-6">
+      <h1 className="mb-2 font-heading text-2xl font-semibold">City Climate Action Tracker</h1>
+      <p className="mb-8 text-sm text-muted-foreground">Select a city to view its climate progress dashboard.</p>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {cities.map((city) => (
+          <Link
+            key={city.id}
+            href={`/public/cities/${city.id}`}
+            className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 transition-colors hover:bg-muted"
+          >
+            <span className="font-heading text-base font-medium">{city.name}</span>
+            <span className="text-xs text-muted-foreground">
+              Baseline: {city.baseline_tons.toLocaleString()} t — Target: {city.target_year}
             </span>
-            <p className="text-xs text-muted-foreground">
-              {onTrack.achieved.toLocaleString()} t/yr achieved vs{" "}
-              {Math.round(onTrack.expectedNow).toLocaleString()} t/yr expected by {currentYear}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sector breakdown */}
-      <div>
-        <h2 className="mb-4 font-heading text-base font-semibold">Sector breakdown</h2>
-        <div className="flex flex-col gap-3">
-          {sectorSummaries.map(({ sector, total, count }) => {
-            const pct = Math.round((total / maxSectorTotal) * 100);
-            return (
-              <div key={sector} className="flex flex-col gap-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">
-                    {SECTOR_LABELS[sector]} — {total.toLocaleString()} t/yr ({count}{" "}
-                    {count === 1 ? "action" : "actions"})
-                  </span>
-                  <span className="text-muted-foreground">{pct}%</span>
-                </div>
-                <div className="h-3 w-full rounded bg-muted">
-                  <div
-                    className="h-3 rounded bg-emerald-500"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Actions list */}
-      <div>
-        <h2 className="mb-4 font-heading text-base font-semibold">All actions</h2>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Sector</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Annual reduction (t)</TableHead>
-              <TableHead>Start year</TableHead>
-              <TableHead>Source</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {actions.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  No actions yet.
-                </TableCell>
-              </TableRow>
-            )}
-            {actions.map((a) => (
-              <TableRow key={a.id}>
-                <TableCell className="max-w-xs truncate font-medium">{a.title}</TableCell>
-                <TableCell>{SECTOR_LABELS[a.sector]}</TableCell>
-                <TableCell>
-                  <StatusBadge status={a.status} />
-                </TableCell>
-                <TableCell className="text-right">
-                  {a.annual_reduction.toLocaleString()}
-                </TableCell>
-                <TableCell>{a.start_year}</TableCell>
-                <TableCell>
-                  <SourceLabel action={a} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+          </Link>
+        ))}
       </div>
     </div>
   );

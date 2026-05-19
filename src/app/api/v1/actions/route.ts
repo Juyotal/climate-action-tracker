@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ClimateActionInsertSchema } from "@/lib/schemas";
+import { requireAdmin } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -18,6 +19,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authErr = await requireAdmin();
+  if (authErr) return authErr;
   const body = await req.json();
   const parsed = ClimateActionInsertSchema.safeParse(body);
   if (!parsed.success) {

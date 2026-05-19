@@ -1,36 +1,36 @@
-// Server Component — fetches city + actions from the API routes.
-// Using API routes (not Prisma directly) keeps the boundary clean and avoids
-// Prisma 7 SSR edge issues with the pg adapter.
+// Admin city list — server component.
+// Shows a card for each city so the admin can navigate to per-city management.
 
-import { CityConfigCard } from "@/components/admin/CityConfigCard";
-import { ActionsTable } from "@/components/admin/ActionsTable";
-import type { City, ClimateAction } from "@/lib/api";
+import Link from "next/link";
+import type { City } from "@/lib/api";
 
-async function fetchCity(): Promise<City> {
+async function fetchCities(): Promise<City[]> {
   const base = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
-  const res = await fetch(`${base}/api/v1/cities/1`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to fetch city");
+  const res = await fetch(`${base}/api/v1/cities`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch cities");
   return res.json();
 }
 
-async function fetchActions(cityId: number): Promise<ClimateAction[]> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
-  const res = await fetch(`${base}/api/v1/actions?cityId=${cityId}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to fetch actions");
-  return res.json();
-}
-
-export default async function AdminPage() {
-  const city = await fetchCity();
-  const actions = await fetchActions(city.id);
+export default async function AdminCityListPage() {
+  const cities = await fetchCities();
 
   return (
-    <>
-      <CityConfigCard city={city} />
-      <section>
-        <h2 className="mb-4 font-heading text-base font-semibold">Climate actions</h2>
-        <ActionsTable city={city} initialActions={actions} />
-      </section>
-    </>
+    <div className="mx-auto max-w-5xl px-4 py-6">
+      <h1 className="mb-6 font-heading text-xl font-semibold">Cities</h1>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {cities.map((city) => (
+          <Link
+            key={city.id}
+            href={`/admin/cities/${city.id}`}
+            className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 transition-colors hover:bg-muted"
+          >
+            <span className="font-heading text-base font-medium">{city.name}</span>
+            <span className="text-xs text-muted-foreground">
+              Baseline: {city.baseline_tons.toLocaleString()} t — Target: {city.target_year}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }

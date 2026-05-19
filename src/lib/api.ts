@@ -47,6 +47,10 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export function listCities(): Promise<City[]> {
+  return apiFetch<City[]>("/api/v1/cities");
+}
+
 export function getCity(id: number): Promise<City> {
   return apiFetch<City>(`/api/v1/cities/${id}`);
 }

@@ -9,7 +9,7 @@ datasource db {
 
 model City {
   id             Int            @id @default(autoincrement())
-  name           String
+  name           String         @unique
   baseline_tons  Int
   baseline_year  Int
   target_year    Int
@@ -47,4 +47,17 @@ model ClimateAction {
   source           Source
   confidence       Float?
   createdAt        DateTime @default(now())
+}
+
+enum Role {
+  admin
+  viewer
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  email         String   @unique
+  password_hash String
+  role          Role
+  createdAt     DateTime @default(now())
 }

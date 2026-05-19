@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { AIExtractedActionSchema } from "@/lib/schemas";
 import { z } from "zod";
+import { requireAdmin } from "@/lib/auth";
 
 const BulkInsertSchema = z.object({
   cityId: z.number().int().positive(),
@@ -9,6 +10,8 @@ const BulkInsertSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const authErr = await requireAdmin();
+  if (authErr) return authErr;
   const body = await req.json();
   const parsed = BulkInsertSchema.safeParse(body);
   if (!parsed.success) {
