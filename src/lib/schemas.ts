@@ -48,3 +48,9 @@ export const AIExtractedActionSchema = z.object({
   start_year: z.number().int().min(2000).max(2100),
   confidence: z.number().min(0).max(1),
 });
+
+// Wraps the per-action schema in the shape Claude returns: { actions: [...] }.
+// Source of truth for the Anthropic tool's input_schema (derived via z.toJSONSchema).
+export const AIExtractToolInputSchema = z.object({
+  actions: z.array(AIExtractedActionSchema),
+});

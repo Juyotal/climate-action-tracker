@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { AIExtractedActionSchema } from "@/lib/schemas";
+import {
+  AIExtractedActionSchema,
+  AIExtractToolInputSchema,
+} from "@/lib/schemas";
 
 const RequestSchema = z.object({
   text: z.string().min(20),
@@ -17,56 +20,11 @@ function getClient() {
   return _client;
 }
 
-// JSON schema for the AI tool — manually kept in sync with AIExtractedActionSchema.
-// zod-to-json-schema v3 does not support Zod v4 (our version), so we define this statically.
-// Fields match AIExtractedActionSchema exactly; server sets cityId and source after extraction.
-const TOOL_INPUT_SCHEMA: Anthropic.Tool["input_schema"] = {
-  type: "object",
-  properties: {
-    actions: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          title: { type: "string", minLength: 1 },
-          sector: {
-            type: "string",
-            enum: ["transport", "energy", "buildings", "waste", "land_use"],
-          },
-          status: {
-            type: "string",
-            enum: ["planned", "in_progress", "completed"],
-          },
-          annual_reduction: {
-            type: "integer",
-            minimum: 0,
-            description: "Annual CO2 reduction in tons/year",
-          },
-          start_year: {
-            type: "integer",
-            minimum: 2000,
-            maximum: 2100,
-          },
-          confidence: {
-            type: "number",
-            minimum: 0,
-            maximum: 1,
-            description: "Confidence score (0–1) for this extraction",
-          },
-        },
-        required: [
-          "title",
-          "sector",
-          "status",
-          "annual_reduction",
-          "start_year",
-          "confidence",
-        ],
-      },
-    },
-  },
-  required: ["actions"],
-};
+// Derived from AIExtractToolInputSchema — single source of truth between
+// server-side Zod validation and the Anthropic tool's declared input schema.
+const TOOL_INPUT_SCHEMA = z.toJSONSchema(
+  AIExtractToolInputSchema
+) as Anthropic.Tool["input_schema"];
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
