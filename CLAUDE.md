@@ -146,7 +146,7 @@ Each phase ends with a feature a human can interact with. Do not mark a phase co
 
 Update this section at the **end of your phase** (last commit). Keep it short.
 
-- [ ] **P1 Foundation** — *not started*
+- [x] **P1 Foundation** — *complete*
 - [ ] **P2 Backend** — *not started* (blocked by P1)
 - [ ] **P3 Admin UI** — *not started* (blocked by P2)
 - [ ] **P4 Public dashboard** — *not started* (blocked by P2)

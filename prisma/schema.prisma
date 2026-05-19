@@ -1,0 +1,50 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model City {
+  id             Int            @id @default(autoincrement())
+  name           String
+  baseline_tons  Int
+  baseline_year  Int
+  target_year    Int
+  actions        ClimateAction[]
+}
+
+enum Sector {
+  transport
+  energy
+  buildings
+  waste
+  land_use
+}
+
+enum Status {
+  planned
+  in_progress
+  completed
+}
+
+enum Source {
+  manual
+  ai
+}
+
+model ClimateAction {
+  id               Int      @id @default(autoincrement())
+  cityId           Int
+  city             City     @relation(fields: [cityId], references: [id])
+  title            String
+  sector           Sector
+  status           Status
+  annual_reduction Int
+  start_year       Int
+  source           Source
+  confidence       Float?
+  createdAt        DateTime @default(now())
+}
