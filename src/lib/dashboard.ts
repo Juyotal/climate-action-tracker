@@ -3,6 +3,57 @@
 
 import type { City, ClimateAction } from "@/lib/api";
 
+export type ProjectionRow = {
+  year: number;
+  required: number;
+  projected: number;
+  current: number | null; // non-null only on the current-year row
+};
+
+export function computeProjection(
+  city: City,
+  actions: ClimateAction[],
+  currentYear: number
+): { rows: ProjectionRow[]; netZeroYear: number | null } {
+  const { baseline_tons, baseline_year, target_year } = city;
+  const lastYear = Math.max(target_year, currentYear + 2);
+  const span = target_year - baseline_year; // denominator for the required ramp
+
+  const rows: ProjectionRow[] = [];
+
+  for (let year = baseline_year; year <= lastYear; year++) {
+    // Required: linear from baseline_tons at baseline_year → 0 at target_year, then 0.
+    const required =
+      year >= target_year
+        ? 0
+        : Math.max(0, baseline_tons - (baseline_tons / span) * (year - baseline_year));
+
+    // Projected: baseline minus cumulative reductions from all actions whose start_year ≤ year.
+    const cumulative = actions
+      .filter((a) => a.start_year <= year)
+      .reduce((sum, a) => sum + a.annual_reduction, 0);
+    const projected = Math.max(0, baseline_tons - cumulative);
+
+    rows.push({
+      year,
+      required: Math.round(required),
+      projected: Math.round(projected),
+      current: year === currentYear ? Math.round(projected) : null,
+    });
+  }
+
+  // Algebraically find the first year projected crosses 0.
+  let netZeroYear: number | null = null;
+  for (const row of rows) {
+    if (row.projected === 0) {
+      netZeroYear = row.year;
+      break;
+    }
+  }
+
+  return { rows, netZeroYear };
+}
+
 export type OnTrackResult = {
   onTrack: boolean;
   achieved: number;

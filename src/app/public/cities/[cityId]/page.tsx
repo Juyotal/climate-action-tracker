@@ -11,7 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { City, ClimateAction } from "@/lib/api";
-import { computeOnTrack, groupBySector } from "@/lib/dashboard";
+import { computeOnTrack, groupBySector, computeProjection } from "@/lib/dashboard";
+import ProjectionChart from "@/components/dashboard/ProjectionChart";
 
 type Props = { params: Promise<{ cityId: string }> };
 
@@ -76,6 +77,9 @@ export default async function PublicCityDashboardPage({ params }: Props) {
 
   const onTrack = computeOnTrack(city, actions, currentYear);
   const sectorSummaries = groupBySector(actions);
+  const { rows: projectionRows, netZeroYear } = computeProjection(city, actions, currentYear);
+  const onTrackProjection =
+    netZeroYear != null && netZeroYear <= city.target_year;
 
   const totalCommitted = actions
     .filter(
@@ -147,6 +151,14 @@ export default async function PublicCityDashboardPage({ params }: Props) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Projection chart */}
+      <ProjectionChart
+        rows={projectionRows}
+        targetYear={city.target_year}
+        netZeroYear={netZeroYear}
+        onTrackProjection={onTrackProjection}
+      />
 
       {/* Sector breakdown */}
       <div>

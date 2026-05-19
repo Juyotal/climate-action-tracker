@@ -23,7 +23,7 @@ This file is the single source of truth for subagents working on this project. R
 - **Validation:** Zod, with `zod-to-json-schema` to derive the Anthropic tool input schema from the same Zod schema (single source of truth)
 - **LLM:** `@anthropic-ai/sdk`, model `claude-sonnet-4-6`, **tool use** for structured extraction
 - **Containerization:** Full — multi-stage Dockerfile + docker-compose.yml runs both Next.js and Postgres
-- **No charts:** Tailwind `<div>` bars only (Recharts deferred)
+- **Charts:** Recharts (added P7) for the projection trajectory; sector breakdown stays as Tailwind bars
 - **No automated tests:** manual QA only
 
 ---
@@ -169,6 +169,7 @@ Update this section at the **end of your phase** (last commit). Keep it short.
 - [x] **P4 Public dashboard** — *complete*
 - [x] **P6 Auth + multi-city** — *complete*
 - [x] **P5 Docs + QA** — *complete*
+- [x] **P7 Projection chart** — *complete*
 
 ---
 
@@ -320,7 +321,6 @@ Define success criteria. Loop until verified.
 
 These are documented as out-of-scope in the README — don't add them on your own initiative:
 
-- Recharts / any chart library.
 - Pagination, search, sorting on the actions table.
 - Action history / audit log.
 - Automated test suite.

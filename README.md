@@ -48,7 +48,7 @@ Both are configurable via `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env`. The seed b
 
 **As anyone** (no login):
 - Visit `/public` — pick a city.
-- Visit `/public/cities/[id]` — see totals, sector breakdown bars, and a green/red on-track indicator with the raw numbers.
+- Visit `/public/cities/[id]` — see totals, sector breakdown bars, a green/red on-track indicator with the raw numbers, and a **projected emissions trajectory chart** (required path vs. projected path, with a "Net zero by YYYY" annotation).
 
 **As an admin** (after `/login`):
 - Visit `/admin` — pick a city.
@@ -111,6 +111,7 @@ docs/
 | Route protection | `src/proxy.ts` matcher on `/admin/**` | One file controls gating |
 | Multi-city | Path-based: `/{public,admin}/cities/[cityId]` | Shareable URLs, no client state |
 | Dashboard math | Server-side in `lib/dashboard.ts` | One place to read; client renders only |
+| Projection chart | Recharts `ComposedChart` (added P7) | Client component; data pre-computed server-side and passed as props |
 
 ### On-track formula
 
@@ -218,7 +219,7 @@ If you want to write an automated suite later, the natural entry points are:
 
 Documented as "future work" rather than implemented:
 
-- Recharts / chart library — dashboard uses Tailwind `<div>` bars
+- ~~Recharts / chart library~~ — added in P7 (projection chart); sector breakdown still uses Tailwind `<div>` bars
 - Pagination, search, sorting on the actions table
 - Action history / audit log
 - Automated test suite
