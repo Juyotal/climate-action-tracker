@@ -8,28 +8,13 @@ Built as a take-home for an AI-Native Software Engineer role at Open Earth Found
 
 ## Quickstart
 
-```bash
-# 1. clone, then in the project root:
-cp .env.example .env
-# Edit .env — fill in ANTHROPIC_API_KEY and generate AUTH_SECRET:
-#   openssl rand -base64 32
-
-# 2. start Postgres
-docker compose up -d postgres
-
-# 3. install deps, run migrations + seed, start dev server
-npm install
-npx prisma migrate deploy --config prisma/config.ts
-npx prisma db seed --config prisma/config.ts
-npm run dev
-```
-
-App on [http://localhost:3000](http://localhost:3000).
-
 **Full Docker (Next.js + Postgres + auto-migrate + auto-seed):**
 
 ```bash
-cp .env.example .env       # populate ANTHROPIC_API_KEY and AUTH_SECRET
+cp .env.example .env 
+# Edit .env — fill in ANTHROPIC_API_KEY and generate AUTH_SECRET:
+#   openssl rand -base64 32
+
 docker compose up --build
 ```
 

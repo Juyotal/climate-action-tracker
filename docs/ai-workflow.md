@@ -79,17 +79,30 @@ The end-to-end time savings dwarfed any single clever helper. The whole project 
 
 ## One moment where I corrected/overrode Claude
 
-**Honestly — there wasn't a substantive one.**
+The clearest code-level correction was in **Phase 2**. The extraction 
+endpoint's first implementation hand-rolled a JSON schema for the Claude 
+tool-use call — defining the expected fields inline rather than deriving 
+them from the Zod schema that already governed the Action model. That's a 
+drift risk: two definitions of the same shape that can fall out of sync. 
+I caught it in the post-phase diff review, flagged it, and had the schema 
+derived from the single Zod source of truth instead. One definition, not two.
 
-The context engineering up front was deliberate enough that the AI execution was effectively flawless on the code itself. The grilling pass nailed down the architecture before any subagent was spawned; `CLAUDE.md` captured those decisions in a place every later agent could read; each per-phase prompt focused on deliverables and rules with explicit manual-test criteria.
+That said, substantive code-level corrections were rare — and I think that's 
+the more interesting story. The context engineering up front (grill-first, 
+CLAUDE.md as shared truth, per-phase manual-test gates) meant most ambiguity 
+was resolved *before* a subagent ran, not after. The remaining friction was 
+mostly process-level:
 
-Within each subagent's scope, the work landed correctly. The few moments that *looked* like corrections were almost all process-level, not code-level:
+- I reminded the orchestrator that subagent spawns need explicit approval 
+  per-scope, not once per session.
+- I overrode the initial parallel-phase plan in favor of sequential — a 
+  coordination call to reduce integration risk, not a code fix.
+- The Lakewood "off-track when it should be on-track" issue was a miss in 
+  *my* seed numbers (CLAUDE.md §11), which the agent implemented faithfully. 
+  Caught via a live SQL check, fixed by bumping one action's value.
 
-- I had to remind the orchestrator that subagent spawns require explicit user approval, even after a previous approval — authorization is per-scope, not per-session. That's a *process* rule, not a "Claude wrote the wrong code" issue.
-- I overrode the orchestrator's initial parallel-phase plan in favor of sequential — that was a *coordination strategy* call, not because the parallel plan would have produced broken code. Either approach would have shipped working software; sequential just had less integration risk.
-- The "Lakewood off-track when it should be on-track" issue was a *data design* miss in my seed plan (the numbers I'd written in CLAUDE.md §11 didn't actually math out to on-track) — the agent implemented those numbers correctly. Caught via live SQL check, fixed by bumping one action.
-
-In other words: when the context was right, the code was right. The handful of friction points were about *what I asked for*, not *how Claude executed it*. That's the strongest signal in the session — most of the work landed in one shot, including the AI extraction pipeline, the auth wiring, and the projection chart, because the inputs were clear enough that there wasn't ambiguity to resolve.
+The pattern: when the input was unambiguous, the output was correct. The 
+corrections that mattered were about *what I asked for*, not *how it executed*.
 
 ---
 
@@ -186,3 +199,5 @@ I left this in deliberately. A real city planner staring at a "we're on pace but
 | **Total session wall-clock from first grilling question to here** | **~3h 20min** |
 
 The split is now closer to 47% agent / 53% human direction — meaning even the "go wild" bonus phase kept the same rhythm: Claude executes fast, but architectural decisions and verification still need a person actively holding the wheel.
+
+*(Btw — the next day, outside the allocated 4hrs, I came back to polish this AI workflow write-up and to containerise the full app (multi-stage Dockerfile + docker-compose for both Next.js and Postgres) so the whole thing boots in a single `docker compose up`. Neither was part of the take-home time budget.)*
