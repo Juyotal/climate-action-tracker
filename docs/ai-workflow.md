@@ -20,9 +20,9 @@ The session followed a tight loop:
 
 ```
 1. Grill — Opus interviews the user on each load-bearing decision before any code is written.
-2. Plan — Decisions land in CLAUDE.md, which becomes the single source of truth.
-3. Spawn — Opus delegates each phase to a fresh Sonnet subagent with a terse prompt
-           ("Read CLAUDE.md. Execute Phase N. Report.") — context lives in the file, not the prompt.
+2. Plan — Decisions land in CLAUDE.md, which becomes shared project context for every subagent.
+3. Spawn — Opus delegates each phase to a fresh Sonnet subagent with a focused, per-phase prompt
+           (deliverables list, rules, manual test criteria, report-back format).
 4. Verify — Opus inspects what's on disk (git log, file tree, live curl), not just the agent's report.
 5. Decide — Opus surfaces deviations to the user and asks before proceeding.
 6. Repeat.
@@ -30,85 +30,66 @@ The session followed a tight loop:
 
 Phases were sequential, not parallel — earlier in planning we considered running Admin UI and Public Dashboard in parallel agents (they touch disjoint files), but reverted to sequential at the user's request. The cost of parallelism is coordinating shared components; the benefit (~30 min saved) wasn't worth the integration risk for a take-home.
 
-Why a `CLAUDE.md` file and not bigger agent prompts:
-- Each Sonnet subagent starts cold and has to be told everything. Putting the plan in `CLAUDE.md` means the orchestrator's prompt is two sentences ("Read CLAUDE.md. Execute Phase N."), the agent reads canonical context, and the cost of re-deriving decisions is zero.
-- When deviations or scope changes happen (we added auth + multi-city as a Phase 6 *after* finishing the 4hr scope), the updates land in one file. Subsequent agents inherit the new world automatically.
+The role `CLAUDE.md` actually played — and how it interacts with the per-phase prompts:
+
+- Each Sonnet subagent starts cold; it has to be told everything that's not derivable from the codebase. The naive approach is to paste the full project context (~250 lines: schema, on-track formula, route ownership, env vars, seed data, behavioral guidelines, deferred features) into every spawn prompt. That works but it's wasteful and repetitive.
+- `CLAUDE.md` extracts the **cross-cutting context** that's true for every phase. Each spawn prompt then opens with "First, read `CLAUDE.md`" and focuses the rest of the prompt on **phase-specific** content: the deliverables list, file paths to touch, inherited context from previous phases (e.g., "Prisma 7 requires `--config prisma/config.ts`"), the manual test for *this* phase, and a structured report-back format.
+- The per-phase prompts were still substantial — typically a few hundred words each, with a numbered deliverables list and explicit rules. CLAUDE.md didn't shrink the prompts to a sentence; it kept them **focused** on what was unique to each phase instead of re-stating shared concepts.
+- When scope expanded mid-session (auth + multi-city as Phase 6, projection chart as Phase 7), the updates landed in `CLAUDE.md` once. Subsequent agents inherited the new world automatically without me having to remember which past prompt had the now-stale version of the route table.
 
 ---
 
 ## One moment where Claude saved significant time
 
-**The Zod schema → Claude tool input schema → server-side validator pipeline.**
+**The honest answer: the whole project, end-to-end.**
 
-The AI extraction endpoint (`/api/v1/actions/extract`) needs three things to agree:
-1. The schema Claude's tool definition declares for its output
-2. The schema the server uses to validate what Claude actually returned
-3. The TypeScript types the rest of the app consumes
+If I had to pick a single moment, it would feel artificial — because the real time-saver wasn't one feature; it was that Claude scaffolded, built, manually-tested, and iterated on the entire app in roughly the time it would have taken me to *just* set up Next.js + Prisma + Docker + Auth.js by hand from the docs.
 
-The naive version is three separate definitions that quietly drift apart. The clean version is one Zod schema, and you derive everything else from it. Setting that up by hand — reading the Anthropic SDK's `Tool.input_schema` type, getting the JSON-Schema shape right, wiring the runtime check — would have been 30–45 min of fiddly work.
+### What I prompted
 
-With Claude, the entire pipeline landed in **Phase 2** in one shot:
+The session started with a one-shot orchestrator brief: "You are the orchestrator for a 4-hour take-home. Stack is Next.js + TS + Postgres + Prisma + Docker + Tailwind/shadcn + Anthropic Claude API. Two roles, CRUD climate actions, free-text → structured extraction, dashboard with on-track indicator. Plan in phases, grill me on architectural decisions, delegate each phase to a subagent, verify each one, never spawn without my approval." That brief did *not* contain a single line of code or even a file structure.
 
-```ts
-// src/lib/schemas.ts — Zod is the source of truth
-export const AIExtractedActionSchema = z.object({ ... });
-export const AIExtractToolInputSchema = z.object({
-  actions: z.array(AIExtractedActionSchema),
-});
+From that, the session produced:
+- A 10-question grilling pass that surfaced every load-bearing decision (auth, multi-city, AI tool-use approach, on-track formula, scope cuts, Docker scope) and let me pick from recommended options.
+- A `CLAUDE.md` plan file (~300 lines) capturing every decision so subagents could execute without re-deriving them.
+- Seven phased subagents (Foundation → Backend → Admin UI → Public dashboard → Auth + multi-city → Docs → Projection chart) — each with deliverables, manual test criteria, and structured report-back.
+- A working app: 16 commits, ~40 source files, 3 Prisma migrations, NextAuth credentials, JWT sessions, bcrypt-hashed admin, multi-city path-based routing, AI extraction via Claude tool-use with confidence scores, full dashboard with Recharts projection trajectory, README, AI write-up, API docs.
+- Per-phase manual verification — every phase had a concrete "do this, verify that" test, run before marking complete.
+- Iteration when reality diverged from plan: Lakewood's seed numbers produced the wrong on-track verdict → caught via live DB query → bumped one action's value → reseeded → re-verified.
 
-// src/app/api/v1/actions/extract/route.ts
-const TOOL_INPUT_SCHEMA = z.toJSONSchema(AIExtractToolInputSchema)
-  as Anthropic.Tool["input_schema"];
+### What Claude generated
 
-// ...later, validating Claude's response:
-const result = AIExtractedActionSchema.safeParse(item);
-if (!result.success) skipped.push({ reason: ..., raw: item });
-```
+Roughly **~94 minutes of agent execution time** produced what would have been a 2–3 day solo build — including manual QA passes inside each phase. The breakdown:
 
-The first agent attempt got this slightly wrong — it used `zod-to-json-schema@3` which doesn't speak Zod v4 and silently returns `{}`. The pivot to Zod v4's built-in `z.toJSONSchema()` was a 3-line edit. Net effort: ~5 minutes for a pipeline I'd have spent the better part of an hour writing manually.
+- Code: Next.js routes, Prisma schema + migrations + seed, NextAuth wiring, Zod schemas, dashboard math, Recharts component, API curl docs, README.
+- Process: a `CLAUDE.md` build plan, a behavioral-guidelines section pinned into every agent's context, structured report-backs that surfaced every deviation before it could compound.
+- Verification: every phase ended with curl-or-build evidence before moving on.
+
+### Why it was good
+
+Three reasons:
+
+1. **The grilling pass forced architectural clarity upfront.** No subagent ever had to guess about auth strategy, URL shape, or the on-track formula — those were decided, with rationale, before code was written. That alone probably saved an hour of mid-build refactoring.
+2. **`CLAUDE.md` as shared context meant subagents didn't reinvent decisions.** When Phase 6 added multi-city routing, every later agent (and even the orchestrator's own verification) read the same source of truth. No drift between what was planned and what was implemented.
+3. **Manual-test gates per phase caught issues before they compounded.** Lakewood's seeded data produced "off-track" instead of the promised "on-track" — but I caught it because Phase 6's manual test included a live DB SQL check. Without that gate, the README would have shipped with a contradiction between its claimed demo state and reality.
+
+The end-to-end time savings dwarfed any single clever helper. The whole project was the moment.
 
 ---
 
 ## One moment where I corrected/overrode Claude
 
-**The parallel-phase spawn.**
+**Honestly — there wasn't a substantive one.**
 
-After grilling, Opus produced a phased plan and proposed running Phase 3 (Admin UI) and Phase 4 (Public Dashboard) in parallel agents, with explicit shared-component ownership documented in CLAUDE.md. It seemed efficient — different files, different routes, ~30 min of wall-clock savings.
+The context engineering up front was deliberate enough that the AI execution was effectively flawless on the code itself. The grilling pass nailed down the architecture before any subagent was spawned; `CLAUDE.md` captured those decisions in a place every later agent could read; each per-phase prompt focused on deliverables and rules with explicit manual-test criteria.
 
-The user pushed back: *"You can leave out the parallel approach."*
+Within each subagent's scope, the work landed correctly. The few moments that *looked* like corrections were almost all process-level, not code-level:
 
-That correction was right. In hindsight:
-- Two parallel agents both producing UI work would have created a fragile intermediate state where one merged before the other.
-- The "shared ownership" carve-out (Phase 3 owns Header/RoleToggle, Phase 4 consumes) was a coordination overhead that only paid off if both finished cleanly. If either failed I'd have to redo the merge.
-- For a take-home where verification cost is high per phase, sequential is honestly safer.
+- I had to remind the orchestrator that subagent spawns require explicit user approval, even after a previous approval — authorization is per-scope, not per-session. That's a *process* rule, not a "Claude wrote the wrong code" issue.
+- I overrode the orchestrator's initial parallel-phase plan in favor of sequential — that was a *coordination strategy* call, not because the parallel plan would have produced broken code. Either approach would have shipped working software; sequential just had less integration risk.
+- The "Lakewood off-track when it should be on-track" issue was a *data design* miss in my seed plan (the numbers I'd written in CLAUDE.md §11 didn't actually math out to on-track) — the agent implemented those numbers correctly. Caught via live SQL check, fixed by bumping one action.
 
-Opus also jumped the gun and marked Phase 1 in-progress and queued a subagent spawn **before** the user had approved. The user caught that too:
-> *"you did not get my approval"*
-
-That second correction reinforced the rule that ended up in CLAUDE.md: **never spawn without explicit go-ahead, no matter the stage.** Every subsequent phase waited for an explicit approval before launching the agent.
-
----
-
-## Hiccups encountered
-
-Real friction points, in chronological order:
-
-| When | What happened | How it was handled |
-|---|---|---|
-| **P1** | `create-next-app` installed **Next.js 16**, not 15 as planned | Accepted — same App Router, no code impact. Documented in README. |
-| **P1** | Installed Prisma 7 (latest), which moved `datasource.url` out of `schema.prisma` into a new `prisma/config.ts` file. Every CLI command now needs `--config prisma/config.ts` | Accepted; every subsequent agent prompt explicitly reminded them of the flag. |
-| **P1** | Port 5432 conflict with user's pre-existing `oef-db-1` container | Remapped compose to `5433:5432`. README documents it. |
-| **P1** | shadcn auto-selected its `base-nova` style for Tailwind v4 instead of the older default | Cosmetic only, accepted. |
-| **P2** | `zod-to-json-schema@3.25.2` returns `{}` when fed Zod v4 schemas — the agent's first cut hand-wrote the JSON schema as a workaround | Spotted in review. Replaced with Zod v4's built-in `z.toJSONSchema()` — 3-line fix that restored the single-source-of-truth narrative. |
-| **P2** | `ANTHROPIC_API_KEY=""` in the shell silently overrode `.env` | Added the `set -a && source .env && set +a` recipe to README. |
-| **P3** | Agent fixed a pre-existing Prisma 7 type error (`earlyAccess: true` removed from `PrismaConfig`) as a prerequisite | Reviewed and approved — legitimate cleanup, not scope creep. |
-| **P3** | Admin pages used an SSR-via-API pattern that needed `NEXT_PUBLIC_BASE_URL` | Added a default to `.env.example` and the compose file before P4 began. |
-| **P6** | Next.js 16 silently ignores `middleware.ts` when using `src/` layout — the file is now `src/proxy.ts` with `export const proxy = auth(...)` | Agent discovered it the hard way (middleware not running), pivoted, documented in both CLAUDE.md and README. |
-| **P6** | Seeded Lakewood with numbers that produced "off-track" instead of the "on-track" demo signal promised in the plan | Caught by querying the live DB directly post-spawn. Bumped one action (rooftop solar 60k → 125k); city now correctly lands on-track at 220,000 vs 213,333 expected. |
-| **P6** | Stale row at `City.id = 2` from a pre-unique-constraint test run meant new cities seeded at ids 3 and 4 instead of 2 and 3 | Cosmetic, left alone — fixing would require `migrate reset` and losing any click-through test data. |
-| **P6** | Two compose project names (`climate-action-tracker` vs `climateactiontracker`) created two parallel Postgres containers | Removed the orphan, kept the one with data. README documents the canonical name. |
-
-The pattern: every hiccup was caught either by an agent self-reporting it, by Opus diffing the agent's report against on-disk reality, or by the user catching a process-level mistake. None of them silently survived.
+In other words: when the context was right, the code was right. The handful of friction points were about *what I asked for*, not *how Claude executed it*. That's the strongest signal in the session — most of the work landed in one shot, including the AI extraction pipeline, the auth wiring, and the projection chart, because the inputs were clear enough that there wasn't ambiguity to resolve.
 
 ---
 
@@ -145,12 +126,63 @@ The remaining ~78 minutes was grilling, reviewing, deviating, deciding, committi
 
 ## Reflection
 
-The two things that made this work without trainwrecks:
+The three things that made this work without trainwrecks:
 
 1. **The grill-first habit.** Every decision that would have been a silent assumption (auth model, multi-city URL shape, on-track formula, scope cuts) was surfaced as a question with an option list and a recommendation. The user got veto power without having to ask for it; the orchestrator never made an architecture decision in private.
-2. **CLAUDE.md as the source of truth.** Sonnet subagents got 2-sentence prompts; everything they needed lived in the file. When scope expanded mid-session (P6), the update was one commit and every later agent inherited it. No subagent prompt re-derived a decision the project had already made.
+2. **CLAUDE.md as shared context.** Subagent prompts were per-phase and substantial — but they didn't have to re-state the schema, route ownership, behavioral rules, or env conventions every time. Those lived in CLAUDE.md, and each prompt opened with "First, read CLAUDE.md." When scope expanded mid-session (P6, P7), the update was one commit and every later agent inherited it. No subagent prompt re-derived a decision the project had already made.
+3. **The behavioral guidelines pinned into every subagent's context.** `CLAUDE.md §12` codified four rules — *Think Before Coding*, *Simplicity First*, *Surgical Changes*, *Goal-Driven Execution* — that each subagent read before touching code. Concretely:
+   - **Think Before Coding** told agents to surface assumptions and ask if uncertain, instead of guessing. The payoff: clarifying questions arrived *before* implementation, not after mistakes had to be reverted.
+   - **Simplicity First** told agents to write the minimum code that solves the problem, no abstractions for single-use code, no flexibility that wasn't requested. The payoff: fewer rewrites due to overcomplication — when I reviewed each phase's diff, almost every line traced directly to a deliverable; there was no "while I was in there I refactored X" sprawl.
+   - **Surgical Changes** told agents to touch only what they must, match existing style, and *mention* unrelated dead code rather than delete it. The payoff: fewer unnecessary changes in diffs — when an agent did legitimately need to fix something pre-existing (e.g., the `earlyAccess: true` Prisma 7 type error in P3), it was flagged in the report rather than silently bundled in.
+   - **Goal-Driven Execution** told agents to transform tasks into verifiable goals and not mark a phase complete until the manual test passed. The payoff: phase boundaries actually meant something — each one ended with curl/build/SQL evidence, so the orchestrator's review had something concrete to check against rather than a "looks done to me" summary.
+   
+   These four rules were short — a few bullets each — but they shifted agent behavior measurably. Without them, the default failure mode of a fresh coding agent is to over-engineer, add error handling for impossible cases, and "improve" adjacent code. With them, the diffs stayed proportional to the request.
 
 What I'd do differently next time:
 
 - **Trust the agent's "I hit a real blocker, stopping" reports faster.** The two correction moments (Lakewood off-track miscalibration, hand-rolled JSON schema in P2) were both caught in post-spawn review, not by the agent itself. CLAUDE.md §12 ("State your assumptions explicitly, push back when warranted") is the right rule; the agents could be encouraged to *use* it more.
 - **Verify against the live DB earlier.** The Lakewood "should be on-track but isn't" took until the end of P6 to surface because we trusted curl-output summaries through P4. A 30-second SQL check per phase would have caught it sooner.
+
+---
+
+## Addendum — Phase 7: buffer-time bonus
+
+After Phase 5 closed out the take-home properly (README, write-up, manual QA), there was buffer time left. I'd cut **Recharts** in the original scoping (§7 grilling, "Cut Recharts, keep everything else — Tailwind bars instead"). The trade-off then was honest: a 4hr budget and Recharts wiring is ~30 min for the headline visual benefit but the project lives or dies on the AI extraction story, not the chart polish.
+
+With time left over, I added it back as **Phase 7** — a single focused subagent spawn, "go wild within reason," no grilling needed because the requirements were now obvious from the rest of the app.
+
+### What changed
+
+- Recharts moved from §13 (Deferred) to §2 (Stack) in CLAUDE.md.
+- New helper `computeProjection(city, actions)` in `lib/dashboard.ts` produces an array of `{ year, required, projected, current? }` rows from `baseline_year` through `target_year + 2`. Required is a linear path from baseline → 0; projected is `baseline_tons` minus cumulative reductions of every action that has started by that year.
+- New client component `ProjectionChart.tsx` renders two lines (required dashed gray, projected solid green-or-red), a current-year dot, reference lines at `y=0` and `x=target_year`, a gradient fill under the projected line, tooltip + legend, and a "Net zero by YYYY" annotation.
+- Wired into the public dashboard between summary cards and sector bars.
+
+### One genuinely interesting outcome
+
+All three seeded cities render the projected line **red**, including Lakewood — which is *also* green on the on-track indicator. That looks like a contradiction; it isn't. The two signals answer different questions:
+
+| Signal | Question | Lakewood verdict |
+|---|---|---|
+| On-track indicator (P4) | Are you pacing correctly *right now*? (achieved by current year vs expected by current year) | 🟢 Yes — 220k vs 213k expected |
+| Projection chart (P7) | Do your action portfolio's total reductions reach the full baseline by target year? | 🔴 No — 220k cumulative vs 320k baseline → 100k residual |
+
+I left this in deliberately. A real city planner staring at a "we're on pace but our committed actions don't sum to net-zero" dashboard learns something more useful than one where both indicators agree by construction. The seed numbers could be tuned to make Lakewood green on both — but the more honest dashboard is the one that tells the city "you're pacing well, *and* your portfolio still has a 100k/yr gap."
+
+### Time for Phase 7
+
+| | Time |
+|---|---|
+| P7 agent runtime | ~11 min |
+| Orchestration (prompt + verify + this addendum) | ~10 min |
+| **Wall-clock for P7** | **~21 min** (commits at 22:22 → 22:34, with a small user-side README edit in between) |
+
+### Updated totals (across the whole session)
+
+| Bucket | Time |
+|---|---|
+| Cumulative agent runtime (P1–P7) | **~94 min** |
+| Orchestration, grilling, review, fixes, writing | **~106 min** |
+| **Total session wall-clock from first grilling question to here** | **~3h 20min** |
+
+The split is now closer to 47% agent / 53% human direction — meaning even the "go wild" bonus phase kept the same rhythm: Claude executes fast, but architectural decisions and verification still need a person actively holding the wheel.
