@@ -26,12 +26,14 @@ npm run dev
 
 App on [http://localhost:3000](http://localhost:3000).
 
-**Full Docker (Next.js + Postgres):**
+**Full Docker (Next.js + Postgres + auto-migrate + auto-seed):**
 
 ```bash
 cp .env.example .env       # populate ANTHROPIC_API_KEY and AUTH_SECRET
 docker compose up --build
 ```
+
+That single command brings up three services in order: `postgres` → `init` (runs `prisma migrate deploy` + `prisma db seed` and exits) → `web` (Next.js, depends on init completing successfully). Open [http://localhost:3000](http://localhost:3000). No manual prisma commands needed.
 
 ### Seeded login
 
@@ -186,6 +188,7 @@ The extract endpoint returns:
 - **Next.js 16** renamed `middleware.ts` to `src/proxy.ts` (export `proxy`). The older filename is silently ignored when using the `src/` directory layout — don't add a `middleware.ts` thinking it does something.
 - **`ANTHROPIC_API_KEY` shadowing**: if your shell already exports an empty `ANTHROPIC_API_KEY=""`, it overrides `.env`. Use `set -a && source .env && set +a && npm run dev` to force `.env` to win.
 - **Port `5433`**: the compose file maps Postgres to host port 5433 (not 5432) to avoid colliding with any other Postgres on your machine. Update `DATABASE_URL` if you change it.
+- **`AUTH_TRUST_HOST=true`**: required by Auth.js v5 when running in production behind localhost or a reverse proxy. The compose file sets it on the `web` service. If you deploy elsewhere, set it (or set `AUTH_URL` to your canonical URL) — otherwise NextAuth refuses to issue session cookies and `/admin` returns 500 instead of redirecting to `/login`.
 
 ---
 
@@ -193,7 +196,7 @@ The extract endpoint returns:
 
 No automated test suite (out of scope for the time budget). Manual verification:
 
-1. `docker compose up -d postgres && npm run dev`
+1. `docker compose up --build` (full stack) **or** the 3-command local-dev path above
 2. Visit `/public` — confirm 3 city cards (Greenville, Riverdale, Lakewood)
 3. Lakewood → 🟢 **On track** (220,000 achieved vs 213,333 expected by 2026)
 4. Riverdale → 🔴 **Off track** (2,500 vs 54,000)
